@@ -1,5 +1,4 @@
 import type { ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
-import type { DecisionCandidateClassification } from "./decision-classifier.js";
 
 export type DecisionStatus = "active" | "draft" | "rejected" | "superseded";
 
@@ -56,10 +55,16 @@ export interface DecisionContextConfig {
 	maxDecisions: number;
 }
 
+export interface DecisionAutoCaptureClassifierConfig {
+	mode: "rule" | "llm" | "hybrid";
+	confidenceThreshold: number;
+}
+
 export interface DecisionAutoCaptureConfig {
 	enabled: boolean;
 	confirm: boolean;
 	maxPerTurn: number;
+	classifier: DecisionAutoCaptureClassifierConfig;
 }
 
 export interface DecisionMemoryConfig {
@@ -87,7 +92,7 @@ export interface DecisionMemoryState {
 	identity: ProjectIdentity | null;
 	memoryFilePath: string | null;
 	indexes: DecisionIndexes;
-	pendingAutoCaptureCandidates: DecisionCandidateClassification[];
+	pendingAutoCaptureCandidates: string[];
 }
 
 export interface DecisionCommandDeps {

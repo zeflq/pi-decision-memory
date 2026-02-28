@@ -172,8 +172,10 @@ Optional (later):
 
 Rules:
 - Source is user prompt only (never assistant text).
-- Rule-based classifier emits `{isDecision, normalizedText, confidence, category, reason}`.
-- Keep only high-confidence candidates (`confidence >= 0.65`).
+- Classifier modes: `rule` | `llm` | `hybrid` (`hybrid` default).
+- Structured classifier output: `{isDecision, normalizedText, confidence, category, reason}`.
+- Keep only high-confidence candidates (`confidence >= autoCapture.classifier.confidenceThreshold`, default `0.65`).
+- `llm` and `hybrid` modes attempt LLM classification and fall back to rule classifier when unavailable.
 - Dedup before UI and before persist.
 - Respect `autoCapture.maxPerTurn`.
 - If multi-select UI is unavailable, fall back to per-candidate Yes/No confirmations.

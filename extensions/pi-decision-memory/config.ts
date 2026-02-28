@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 
 import type {
+	DecisionAutoCaptureClassifierConfig,
 	DecisionAutoCaptureConfig,
 	DecisionContextConfig,
 	DecisionMemoryConfig,
@@ -13,7 +14,12 @@ type PartialDecisionMemoryConfig = {
 	enabled?: boolean;
 	retentionDays?: Partial<RetentionDays>;
 	context?: Partial<DecisionContextConfig>;
-	autoCapture?: Partial<DecisionAutoCaptureConfig>;
+	autoCapture?: {
+		enabled?: boolean;
+		confirm?: boolean;
+		maxPerTurn?: number;
+		classifier?: Partial<DecisionAutoCaptureClassifierConfig>;
+	};
 };
 
 const DEFAULT_RETENTION_DAYS: RetentionDays = {
@@ -30,6 +36,10 @@ const DEFAULT_AUTO_CAPTURE_CONFIG: DecisionAutoCaptureConfig = {
 	enabled: true,
 	confirm: true,
 	maxPerTurn: 2,
+	classifier: {
+		mode: "hybrid",
+		confidenceThreshold: 0.65,
+	},
 };
 
 const MIN_MAX_DECISIONS = 1;
@@ -52,6 +62,10 @@ function createDefaultConfig(): DecisionMemoryConfig {
 			enabled: DEFAULT_AUTO_CAPTURE_CONFIG.enabled,
 			confirm: DEFAULT_AUTO_CAPTURE_CONFIG.confirm,
 			maxPerTurn: DEFAULT_AUTO_CAPTURE_CONFIG.maxPerTurn,
+			classifier: {
+				mode: DEFAULT_AUTO_CAPTURE_CONFIG.classifier.mode,
+				confidenceThreshold: DEFAULT_AUTO_CAPTURE_CONFIG.classifier.confidenceThreshold,
+			},
 		},
 	};
 }
@@ -79,8 +93,17 @@ function parseContextConfig(raw: unknown): Partial<DecisionContextConfig> {
 	};
 }
 
-function parseAutoCaptureConfig(raw: unknown): Partial<DecisionAutoCaptureConfig> {
+function parseAutoCaptureConfig(raw: unknown): PartialDecisionMemoryConfig["autoCapture"] {
 	if (!isRecord(raw)) return {};
+
+	const classifierRaw = isRecord(raw.classifier) ? raw.classifier : {};
+	const classifier: Partial<DecisionAutoCaptureClassifierConfig> = {};
+	if (classifierRaw.mode === "rule" || classifierRaw.mode === "llm" || classifierRaw.mode === "hybrid") {
+		classifier.mode = classifierRaw.mode;
+	}
+	if (typeof classifierRaw.confidenceThreshold === "number") {
+		classifier.confidenceThreshold = clampNumber(classifierRaw.confidenceThreshold, 0, 1);
+	}
 
 	return {
 		enabled: typeof raw.enabled === "boolean" ? raw.enabled : undefined,
@@ -89,6 +112,7 @@ function parseAutoCaptureConfig(raw: unknown): Partial<DecisionAutoCaptureConfig
 			typeof raw.maxPerTurn === "number"
 				? clampNumber(Math.floor(raw.maxPerTurn), MIN_AUTO_CAPTURE_PER_TURN, MAX_AUTO_CAPTURE_PER_TURN)
 				: undefined,
+		classifier: Object.keys(classifier).length > 0 ? classifier : undefined,
 	};
 }
 
@@ -162,6 +186,11 @@ function mergeConfig(base: DecisionMemoryConfig, override: PartialDecisionMemory
 			enabled: override.autoCapture?.enabled ?? base.autoCapture.enabled,
 			confirm: override.autoCapture?.confirm ?? base.autoCapture.confirm,
 			maxPerTurn: override.autoCapture?.maxPerTurn ?? base.autoCapture.maxPerTurn,
+			classifier: {
+				mode: override.autoCapture?.classifier?.mode ?? base.autoCapture.classifier.mode,
+				confidenceThreshold:
+					override.autoCapture?.classifier?.confidenceThreshold ?? base.autoCapture.classifier.confidenceThreshold,
+			},
 		},
 	};
 }

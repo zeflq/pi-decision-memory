@@ -61,7 +61,11 @@ Project config overrides global (unless global `enabled: false`).
   "autoCapture": {
     "enabled": true,
     "confirm": true,
-    "maxPerTurn": 2
+    "maxPerTurn": 2,
+    "classifier": {
+      "mode": "hybrid",
+      "confidenceThreshold": 0.65
+    }
   }
 }
 ```
@@ -70,6 +74,8 @@ Project config overrides global (unless global `enabled: false`).
 
 - `context.maxDecisions`: default `20`, clamped `1..20`
 - `autoCapture.maxPerTurn`: default `2`, clamped `1..5`
+- `autoCapture.classifier.mode`: `rule` | `llm` | `hybrid` (default `hybrid`)
+- `autoCapture.classifier.confidenceThreshold`: default `0.65`, clamped `0..1`
 - `retentionDays` applies to non-active statuses only
 
 ## Retention and purge rules
@@ -152,8 +158,10 @@ In this project we will use clean architecture
 Behavior:
 
 - source is user prompt only (never assistant text)
-- rule-based classifier scores candidates and keeps high confidence (`>= 0.65`)
+- classifier modes: `rule`, `llm`, `hybrid` (default `hybrid`)
 - structured classification fields: `isDecision`, `normalizedText`, `confidence`, `category`, `reason`
+- candidates are kept when `confidence >= autoCapture.classifier.confidenceThreshold` (default `0.65`)
+- `llm`/`hybrid` fall back to rule classifier if model/api key or classification parsing is unavailable
 - capped by `autoCapture.maxPerTurn`
 - skips exact normalized duplicates of active decisions
 - asks confirmation/selection when `autoCapture.confirm = true`

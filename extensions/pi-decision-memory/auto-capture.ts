@@ -3,6 +3,7 @@ import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 
 import { createAddEvent, normalizeText, persistAndApply } from "./commands/command-utils.js";
 import { classifyDecisionCandidate, type DecisionCandidateClassification } from "./decision-classifier.js";
+import { classifyDecisionCandidateWithLLM } from "./decision-classifier-llm.js";
 import type { Decision, DecisionCommandDeps } from "./types.js";
 
 function cleanCandidate(text: string): string {
@@ -23,19 +24,13 @@ function extractDecisionLikeCandidates(prompt: string, max: number): string[] {
 		if (explicit) {
 			const text = cleanCandidate(explicit[1] ?? "");
 			if (text.length > 0) candidates.push(text);
-			if (candidates.length >= max) break;
-			continue;
-		}
-
-		if (
-			/^(?:[-*]\s*)?(?:use|adopt|build|implement|enforce|standardize|avoid|do not|don't|never|must|should|please use|please avoid|we will|in this project we will|for this project we will)\b/i.test(
-				line,
-			)
-		) {
+		} else {
+			// Broad intake: let classifier decide durability, so typos/noisy wording still get a chance.
 			const text = cleanCandidate(line);
 			if (text.length > 0) candidates.push(text);
-			if (candidates.length >= max) break;
 		}
+
+		if (candidates.length >= max) break;
 	}
 
 	return candidates;
@@ -52,8 +47,6 @@ function isDuplicateActiveDecision(text: string, deps: DecisionCommandDeps): boo
 	}
 	return false;
 }
-
-const DECISION_CONFIDENCE_THRESHOLD = 0.65;
 
 function normalizeUnique(values: DecisionCandidateClassification[]): DecisionCandidateClassification[] {
 	const seen = new Set<string>();
@@ -82,12 +75,44 @@ export function preparePendingAutoCaptureFromPrompt(prompt: string, deps: Decisi
 	if (prompt.trim().length === 0) return;
 
 	const rawCandidates = extractDecisionLikeCandidates(prompt, deps.state.config.autoCapture.maxPerTurn);
-	const classified = rawCandidates
-		.map((candidate) => classifyDecisionCandidate(candidate))
-		.filter((candidate) => candidate.isDecision)
-		.filter((candidate) => candidate.confidence >= DECISION_CONFIDENCE_THRESHOLD)
-		.filter((candidate) => !isDuplicateActiveDecision(candidate.normalizedText, deps));
-	deps.state.pendingAutoCaptureCandidates = normalizeUnique(classified);
+	const deduped = Array.from(new Set(rawCandidates.map((candidate) => normalizeText(candidate)))).map(
+		(normalized) => rawCandidates.find((c) => normalizeText(c) === normalized) as string,
+	);
+	deps.state.pendingAutoCaptureCandidates = deduped.filter((candidate) => !isDuplicateActiveDecision(candidate, deps));
+}
+
+async function classifyCandidateByMode(
+	candidate: string,
+	ctx: ExtensionContext,
+	deps: DecisionCommandDeps,
+): Promise<DecisionCandidateClassification | null> {
+	const mode = deps.state.config.autoCapture.classifier.mode;
+	const rule = classifyDecisionCandidate(candidate);
+	if (mode === "rule") return rule;
+
+	const llm = await classifyDecisionCandidateWithLLM(candidate, ctx);
+	if (mode === "llm") return llm ?? rule;
+
+	if (!llm) return rule;
+	return llm.confidence >= rule.confidence ? llm : rule;
+}
+
+async function classifyPendingCandidates(
+	pending: string[],
+	ctx: ExtensionContext,
+	deps: DecisionCommandDeps,
+): Promise<DecisionCandidateClassification[]> {
+	const threshold = deps.state.config.autoCapture.classifier.confidenceThreshold;
+	const classified: DecisionCandidateClassification[] = [];
+	for (const candidate of pending) {
+		const result = await classifyCandidateByMode(candidate, ctx, deps);
+		if (!result) continue;
+		if (!result.isDecision) continue;
+		if (result.confidence < threshold) continue;
+		if (isDuplicateActiveDecision(result.normalizedText, deps)) continue;
+		classified.push(result);
+	}
+	return normalizeUnique(classified);
 }
 
 async function selectCandidatesToCapture(
@@ -145,11 +170,12 @@ export async function finalizePendingAutoCapture(
 	if (pending.length === 0) return;
 	if (shouldSkipCaptureAfterRun(messages)) return;
 
-	const selected = await selectCandidatesToCapture(pending, ctx, deps);
+	const classified = await classifyPendingCandidates(pending, ctx, deps);
+	const selected = await selectCandidatesToCapture(classified, ctx, deps);
 	for (const candidate of selected) {
 		if (isDuplicateActiveDecision(candidate.normalizedText, deps)) continue;
 		const event = createAddEvent(deps, candidate.normalizedText, new Date(), undefined, {
-			source: "auto-rule-classifier",
+			source: candidate.source === "llm" ? "auto-llm-classifier" : "auto-rule-classifier",
 			confidence: candidate.confidence,
 			category: candidate.category,
 			reason: candidate.reason,

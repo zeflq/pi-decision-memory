@@ -136,4 +136,4 @@
 - [x] Add optional metadata on persisted decisions (source + confidence + category)
 - [x] Add tests for classifier gating and transient-instruction rejection
 - [x] Add docs for classifier behavior, confidence thresholds, and fallback rules
-- [ ] (Future) Add LLM-backed classifier mode for richer semantic detection
+- [x] Add LLM-backed classifier mode for richer semantic detection (with fallback to rule classifier)

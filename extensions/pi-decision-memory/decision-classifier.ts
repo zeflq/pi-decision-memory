@@ -8,6 +8,7 @@ export interface DecisionCandidateClassification {
 	confidence: number;
 	category: DecisionCandidateCategory;
 	reason: string;
+	source: "rule" | "llm";
 }
 
 const transientPatterns = [
@@ -45,6 +46,7 @@ export function classifyDecisionCandidate(line: string): DecisionCandidateClassi
 			confidence: 0.1,
 			category: "workflow",
 			reason: "too short",
+			source: "rule",
 		};
 	}
 
@@ -56,6 +58,7 @@ export function classifyDecisionCandidate(line: string): DecisionCandidateClassi
 				confidence: 0.2,
 				category: "workflow",
 				reason: "transient instruction",
+				source: "rule",
 			};
 		}
 	}
@@ -68,6 +71,7 @@ export function classifyDecisionCandidate(line: string): DecisionCandidateClassi
 				confidence: candidate.confidence,
 				category: candidate.category,
 				reason: candidate.reason,
+				source: "rule",
 			};
 		}
 	}
@@ -80,6 +84,7 @@ export function classifyDecisionCandidate(line: string): DecisionCandidateClassi
 			confidence: 0.68,
 			category: "workflow",
 			reason: "directive statement",
+			source: "rule",
 		};
 	}
 
@@ -89,5 +94,6 @@ export function classifyDecisionCandidate(line: string): DecisionCandidateClassi
 		confidence: normalized.length > 40 ? 0.35 : 0.15,
 		category: "workflow",
 		reason: "low confidence",
+		source: "rule",
 	};
 }

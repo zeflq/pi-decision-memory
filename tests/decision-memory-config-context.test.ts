@@ -48,7 +48,12 @@ describe("decision memory config", () => {
 		expect(config.enabled).toBe(true);
 		expect(config.retentionDays).toEqual({ draft: 30, rejected: 90, superseded: 180 });
 		expect(config.context.maxDecisions).toBe(20);
-		expect(config.autoCapture).toEqual({ enabled: true, confirm: true, maxPerTurn: 2 });
+		expect(config.autoCapture).toEqual({
+			enabled: true,
+			confirm: true,
+			maxPerTurn: 2,
+			classifier: { mode: "hybrid", confidenceThreshold: 0.65 },
+		});
 
 		rmSync(root, { recursive: true, force: true });
 	});
@@ -69,6 +74,7 @@ describe("decision memory config", () => {
 				enabled: true,
 				retentionDays: { draft: 10, rejected: 20, superseded: 30 },
 				context: { maxDecisions: 99 },
+				autoCapture: { classifier: { mode: "llm", confidenceThreshold: 2 } },
 			}),
 		);
 		writeFileSync(
@@ -76,6 +82,7 @@ describe("decision memory config", () => {
 			JSON.stringify({
 				retentionDays: { draft: 7 },
 				context: { maxDecisions: 0 },
+				autoCapture: { classifier: { mode: "rule", confidenceThreshold: -1 } },
 			}),
 		);
 
@@ -87,6 +94,8 @@ describe("decision memory config", () => {
 		expect(config.enabled).toBe(true);
 		expect(config.retentionDays).toEqual({ draft: 7, rejected: 20, superseded: 30 });
 		expect(config.context.maxDecisions).toBe(1);
+		expect(config.autoCapture.classifier.mode).toBe("rule");
+		expect(config.autoCapture.classifier.confidenceThreshold).toBe(0);
 
 		rmSync(root, { recursive: true, force: true });
 	});
