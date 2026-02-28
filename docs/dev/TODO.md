@@ -1,0 +1,126 @@
+- [x] Confirm extension location and naming (`extensions/pi-decision-memory`)
+- [x] Create standalone package at project root (`package.json`)
+- [x] Add `pi` manifest in package.json (`"pi": { "extensions": ["./extensions"] }`)
+- [x] Add required test/tooling packages (`vitest`, `tsx`, `typescript`, `@types/node`)
+- [x] Move tests into standalone package (`tests/*.test.ts`)
+- [x] Simplify storage to one canonical project-local file (`<project>/.pi/decision-memory/decisions.jsonl`)
+- [x] Remove global project-memory file usage from runtime code
+- [x] Create scaffold files:
+- [x] `index.ts` (default export extension function)
+- [x] `types.ts` (event + decision + config types)
+- [x] `config.ts` (global/project config load + merge)
+- [x] `project-id.ts` (git-root/cwd resolution + hash)
+- [x] `store.ts` (JSONL append/read + compact codec)
+- [x] `indexes.ts` (in-memory `byId` + optional `byStatus`/`byTag`)
+- [x] `commands/index.ts` (`/decision` command registration + routing)
+- [x] Split command logic into single-responsibility files under `commands/` (`commands/*.ts`)
+- [x] `context.ts` (`before_agent_start` token-safe injection)
+- [x] Implement compact on-disk event codec:
+- [x] `encodeEvent` writes compact keys (`t,p,e,i,d,u` + nested short keys)
+- [x] `decodeEvent` restores readable runtime shape
+- [x] Keep schema versioning (`v`) and validation guards
+- [x] Centralize default values via config defaults (`getDefaultConfig`) to avoid duplication
+- [x] Implement session initialization (`session_start`):
+- [x] Load global config (`~/.pi/agent/decision-memory.config.json`)
+- [x] Resolve project identity (git root -> cwd fallback)
+- [x] Load project config (`<project>/.pi/decision-memory.config.json`)
+- [x] Compute effective `enabled` + merged `retentionDays`
+- [x] Load/replay JSONL and build runtime indexes
+- [x] Implement command: `/decision help`
+- [x] Implement command: `/decision status`
+- [x] Implement command: `/decision add <text>`
+- [x] Implement command: `/decision list`
+- [x] Implement command: `/decision search <query>`
+- [x] Implement command: `/decision edit <id> <text>`
+- [x] Implement command: `/decision remove <id>`
+- [x] Implement command: `/decision supersede <oldId> <newText>`
+- [x] Implement command: `/decision purge` with confirmation + retention policy
+- [x] Implement command: `/decision reset|clear [--yes]` to clear all decisions
+- [x] Implement command: `/decision enable --global`
+- [x] Implement command: `/decision disable --global`
+- [x] Implement command: `/decision enable --project`
+- [x] Implement command: `/decision disable --project`
+- [x] Implement auto-capture (explicit user `Decision:` markers)
+- [x] Add `autoCapture` config (`enabled`, `confirm`, `maxPerTurn`)
+- [x] Hook auto-capture on `before_agent_start`
+- [x] Skip duplicates against active decisions during auto-capture
+- [x] Enforce disabled behavior:
+- [x] No context injection when disabled
+- [x] No memory writes when disabled
+- [x] Mutating commands return clear disabled message
+- [x] Implement duplicate/conflict handling:
+- [x] Normalize text for duplicate detection
+- [x] Prompt options: update existing / force create / cancel
+- [x] Conflict options: supersede / keep+mark conflict / cancel
+- [x] Enforce token-aware injection limits:
+- [x] Active-only decisions
+- [x] Latest N configurable via `context.maxDecisions` (default 20, max 20)
+- [x] `maxCharsPerDecision = 160`
+- [x] `maxSectionChars = 2200`
+- [x] Compact line format in prompt (`D-xxxx | short text | #tags`)
+- [x] Add recovery behavior:
+- [x] Rebuild indexes from JSONL on startup
+- [x] Regenerate indexes if missing/corrupt
+- [x] Add documentation:
+- [x] Update extension README with usage/examples
+- [x] Document compact disk schema + codec map
+- [x] Document config fields + defaults + retention rules
+- [x] Add tests:
+- [x] Keep tests single-responsibility (split by module/command area)
+- [x] Implemented test file: `tests/decision-memory-config-context.test.ts`
+- [x] Covers: config defaults, global/project merge precedence, global disabled override, `context.maxDecisions` clamp, context injection active-only + disabled behavior
+- [x] Implemented test file: `tests/decision-memory-store.test.ts`
+- [x] Covers: compact codec encode/decode, JSONL load filtering invalid lines
+- [x] Implemented test file: `tests/decision-memory-indexes.test.ts`
+- [x] Covers: index replay/apply behavior
+- [x] Implemented test file: `tests/decision-memory-commands-basic.test.ts`
+- [x] Covers: `/decision add|list|search`
+- [x] Implemented test file: `tests/decision-memory-commands-mutations.test.ts`
+- [x] Covers: `/decision edit|remove|supersede|purge` including confirmation path
+- [x] Implemented test file: `tests/decision-memory-commands-duplicate-conflict.test.ts`
+- [x] Covers: duplicate detection + user options, conflict handling options
+- [x] Implemented test file: `tests/decision-memory-commands-toggle-disabled.test.ts`
+- [x] Covers: `/decision enable|disable`, mutating blocked when disabled, no write when disabled
+- [x] Implemented test file: `tests/decision-memory-auto-capture.test.ts`
+- [x] Covers: auto-capture extraction, confirmation, maxPerTurn limit, duplicate skip, disabled behavior
+- [x] Implemented test file: `tests/decision-memory-project-id.test.ts`
+- [x] Covers: project identity resolution (`git rev-parse` success + fallback to cwd)
+- [x] Implemented test file: `tests/decision-memory-disabled-e2e.test.ts`
+- [x] Covers: disabled mode end-to-end (no writes + no injection + auto-capture blocked)
+- [x] Implemented test file: `tests/decision-memory-recovery.test.ts`
+- [x] Covers: JSONL replay rebuild, corrupt-line tolerance/regeneration
+- [x] To implement test: auto-capture flow (`before_agent_start` explicit `Decision:` extraction, confirm path, duplicate skip)
+- [x] To implement test: `/decision edit` flow (event append + in-memory update)
+- [x] To implement test: `/decision remove` flow (event append + index removal)
+- [x] To implement test: `/decision supersede` flow (old -> superseded, new -> active)
+- [x] To implement test: `/decision purge` retention behavior + confirmation path
+- [x] To implement test: `/decision reset|clear --yes` clears all decisions
+- [x] To implement test: duplicate/conflict detection options and outcomes
+- [x] To implement test: disabled mode end-to-end (no writes + no injection)
+- [x] Run checks from repo root/package root: `npm run test:decision-memory` + `npx tsc --noEmit`
+- [x] Run only targeted tests if requested
+- [x] Final pre-PR pass:
+- [x] Verify file paths and naming consistency
+- [x] Verify backward-compatible defaults (`enabled: true`)
+- [x] Verify no unintended API or behavior regressions
+- [x] Prepare PR:
+- [x] Summarize scope, storage model, and token-aware behavior
+- [x] Include test evidence and known limitations
+- [x] Ensure changes are limited to relevant files only
+- [x] Keep this TODO file updated after every completed step
+- [x] Set up SemVer/changelog tooling from Conventional Commits (`standard-version`, `conventional-changelog-cli`)
+- [x] Add release scripts with required checks before versioning
+
+## Next Iteration: Auto-capture v2 (post-run, multi-select)
+
+- [ ] Extract decision/order candidates from user prompt on `before_agent_start`
+- [ ] Add in-memory pending-candidates state for current turn/session
+- [ ] Trigger capture confirmation on `agent_end` (after work is done)
+- [ ] Implement multi-select review UI to choose which candidates to save
+- [ ] Fallback to sequential Yes/No confirms when multi-select is unavailable
+- [ ] Persist only selected candidates as add events
+- [ ] Enforce duplicate checks before prompt and before persist
+- [ ] Skip post-run capture prompt on failed/cancelled runs
+- [ ] Add tests for multi-candidate selection behavior
+- [ ] Add tests for fallback confirm behavior (no multi-select)
+- [ ] Update README with post-run confirmation flow and examples
