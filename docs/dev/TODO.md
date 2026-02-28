@@ -124,3 +124,16 @@
 - [x] Add tests for multi-candidate selection behavior
 - [x] Add tests for fallback confirm behavior (no multi-select)
 - [x] Update README with post-run confirmation flow and examples
+
+## Next Iteration: Intelligent decision detection
+
+- [x] Keep current rule-based extractor as fallback path
+- [x] Add rule-based classifier for candidate lines (durable decision vs transient instruction)
+- [x] Require structured classifier output: `{isDecision, normalizedText, confidence, category, reason}`
+- [x] Keep only high-confidence classifier candidates for review
+- [x] Feed normalized classifier text into post-run multi-select review
+- [x] Preserve existing duplicate checks before persist
+- [x] Add optional metadata on persisted decisions (source + confidence + category)
+- [x] Add tests for classifier gating and transient-instruction rejection
+- [x] Add docs for classifier behavior, confidence thresholds, and fallback rules
+- [ ] (Future) Add LLM-backed classifier mode for richer semantic detection

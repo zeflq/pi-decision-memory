@@ -2,6 +2,7 @@ import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 
 import { createAddEvent, normalizeText, persistAndApply } from "./commands/command-utils.js";
+import { classifyDecisionCandidate, type DecisionCandidateClassification } from "./decision-classifier.js";
 import type { Decision, DecisionCommandDeps } from "./types.js";
 
 function cleanCandidate(text: string): string {
@@ -27,7 +28,7 @@ function extractDecisionLikeCandidates(prompt: string, max: number): string[] {
 		}
 
 		if (
-			/^(?:[-*]\s*)?(?:use|adopt|build|implement|enforce|standardize|avoid|do not|don't|never|must|should|please use|please avoid)\b/i.test(
+			/^(?:[-*]\s*)?(?:use|adopt|build|implement|enforce|standardize|avoid|do not|don't|never|must|should|please use|please avoid|we will|in this project we will|for this project we will)\b/i.test(
 				line,
 			)
 		) {
@@ -52,11 +53,13 @@ function isDuplicateActiveDecision(text: string, deps: DecisionCommandDeps): boo
 	return false;
 }
 
-function normalizeUnique(values: string[]): string[] {
+const DECISION_CONFIDENCE_THRESHOLD = 0.65;
+
+function normalizeUnique(values: DecisionCandidateClassification[]): DecisionCandidateClassification[] {
 	const seen = new Set<string>();
-	const unique: string[] = [];
+	const unique: DecisionCandidateClassification[] = [];
 	for (const value of values) {
-		const normalized = normalizeText(value);
+		const normalized = normalizeText(value.normalizedText);
 		if (seen.has(normalized)) continue;
 		seen.add(normalized);
 		unique.push(value);
@@ -79,34 +82,44 @@ export function preparePendingAutoCaptureFromPrompt(prompt: string, deps: Decisi
 	if (prompt.trim().length === 0) return;
 
 	const rawCandidates = extractDecisionLikeCandidates(prompt, deps.state.config.autoCapture.maxPerTurn);
-	const uniqueCandidates = normalizeUnique(rawCandidates).filter((candidate) => !isDuplicateActiveDecision(candidate, deps));
-	deps.state.pendingAutoCaptureCandidates = uniqueCandidates;
+	const classified = rawCandidates
+		.map((candidate) => classifyDecisionCandidate(candidate))
+		.filter((candidate) => candidate.isDecision)
+		.filter((candidate) => candidate.confidence >= DECISION_CONFIDENCE_THRESHOLD)
+		.filter((candidate) => !isDuplicateActiveDecision(candidate.normalizedText, deps));
+	deps.state.pendingAutoCaptureCandidates = normalizeUnique(classified);
 }
 
 async function selectCandidatesToCapture(
-	candidates: string[],
+	candidates: DecisionCandidateClassification[],
 	ctx: ExtensionContext,
 	deps: DecisionCommandDeps,
-): Promise<string[]> {
+): Promise<DecisionCandidateClassification[]> {
 	if (candidates.length === 0) return [];
 	if (!deps.state.config.autoCapture.confirm || !ctx.hasUI) return candidates;
 
 	try {
 		const remaining = [...candidates];
-		const selected: string[] = [];
+		const selected: DecisionCandidateClassification[] = [];
 		while (remaining.length > 0) {
-			const choice = await ctx.ui.select("Auto-capture decisions", [...remaining, "Done"]);
+			const labels = remaining.map(
+				(candidate) => `${candidate.normalizedText} (${candidate.category}, ${Math.round(candidate.confidence * 100)}%)`,
+			);
+			const choice = await ctx.ui.select("Auto-capture decisions", [...labels, "Done"]);
 			if (!choice || choice === "Done") break;
-			selected.push(choice);
-			const nextRemaining = remaining.filter((item) => item !== choice);
-			remaining.length = 0;
-			remaining.push(...nextRemaining);
+			const chosenIndex = labels.indexOf(choice);
+			if (chosenIndex < 0) break;
+			selected.push(remaining[chosenIndex]);
+			remaining.splice(chosenIndex, 1);
 		}
 		return selected;
 	} catch {
-		const selected: string[] = [];
+		const selected: DecisionCandidateClassification[] = [];
 		for (const candidate of candidates) {
-			const ok = await ctx.ui.confirm("Auto-capture decision", `Add decision?\n\n${candidate}`);
+			const ok = await ctx.ui.confirm(
+				"Auto-capture decision",
+				`Add decision?\n\n${candidate.normalizedText}\n\n(${candidate.category}, ${Math.round(candidate.confidence * 100)}%)`,
+			);
 			if (ok) selected.push(candidate);
 		}
 		return selected;
@@ -134,8 +147,13 @@ export async function finalizePendingAutoCapture(
 
 	const selected = await selectCandidatesToCapture(pending, ctx, deps);
 	for (const candidate of selected) {
-		if (isDuplicateActiveDecision(candidate, deps)) continue;
-		const event = createAddEvent(deps, candidate, new Date());
+		if (isDuplicateActiveDecision(candidate.normalizedText, deps)) continue;
+		const event = createAddEvent(deps, candidate.normalizedText, new Date(), undefined, {
+			source: "auto-rule-classifier",
+			confidence: candidate.confidence,
+			category: candidate.category,
+			reason: candidate.reason,
+		});
 		if (!event) continue;
 		await persistAndApply(event, deps);
 		if (ctx.hasUI) {

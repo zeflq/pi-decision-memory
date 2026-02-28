@@ -172,10 +172,13 @@ Optional (later):
 
 Rules:
 - Source is user prompt only (never assistant text).
+- Rule-based classifier emits `{isDecision, normalizedText, confidence, category, reason}`.
+- Keep only high-confidence candidates (`confidence >= 0.65`).
 - Dedup before UI and before persist.
 - Respect `autoCapture.maxPerTurn`.
 - If multi-select UI is unavailable, fall back to per-candidate Yes/No confirmations.
 - If run fails/cancels, skip capture prompt by default.
+- Persist classifier metadata (`source`, `confidence`, `category`) with added decisions.
 
 ---
 

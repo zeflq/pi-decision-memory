@@ -92,7 +92,13 @@ export function nextDecisionId(existingIds: Iterable<string>, now: Date): string
 	return `${dayPrefix}${String(maxForDay + 1).padStart(4, "0")}`;
 }
 
-export function createAddEvent(deps: DecisionCommandDeps, text: string, now: Date, supersedes?: string): DecisionEvent | null {
+export function createAddEvent(
+	deps: DecisionCommandDeps,
+	text: string,
+	now: Date,
+	supersedes?: string,
+	meta?: { source?: string; confidence?: number; category?: string; reason?: string },
+): DecisionEvent | null {
 	const identity = deps.state.identity;
 	if (!identity) {
 		return null;
@@ -112,6 +118,10 @@ export function createAddEvent(deps: DecisionCommandDeps, text: string, now: Dat
 			tags: [],
 			conflictsWith: [],
 			supersedes: supersedes ?? null,
+			source: meta?.source,
+			confidence: meta?.confidence,
+			category: meta?.category,
+			reason: meta?.reason,
 		},
 		u: "user",
 	};

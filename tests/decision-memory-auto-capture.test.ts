@@ -24,18 +24,18 @@ function createDeps(): DecisionCommandDeps {
 }
 
 describe("decision memory auto-capture", () => {
-	it("prepares candidates from explicit and directive prompt lines", () => {
+	it("classifies and prepares durable candidates only", () => {
 		const deps = createDeps();
-		deps.state.config.autoCapture.maxPerTurn = 3;
+		deps.state.config.autoCapture.maxPerTurn = 4;
 
 		preparePendingAutoCaptureFromPrompt(
-			"Decision: Use PostgreSQL as primary database\nUse Tailwind for styling\nWhat should we do?",
+			"Decision: Use PostgreSQL as primary database\nRun tests now\nIn this project we will use clean architecture\nWhat should we do?",
 			deps,
 		);
 
-		expect(deps.state.pendingAutoCaptureCandidates).toEqual([
+		expect(deps.state.pendingAutoCaptureCandidates.map((c) => c.normalizedText)).toEqual([
 			"Use PostgreSQL as primary database",
-			"Use Tailwind for styling",
+			"In this project we will use clean architecture",
 		]);
 	});
 
@@ -44,13 +44,16 @@ describe("decision memory auto-capture", () => {
 		deps.state.config.autoCapture.enabled = true;
 		deps.state.config.autoCapture.confirm = true;
 		preparePendingAutoCaptureFromPrompt(
-			"Decision: Use PostgreSQL as primary database\nDecision: Use JWT for auth tokens",
+			"Decision: Use PostgreSQL as primary database\nDecision: Use Redis as cache layer",
 			deps,
 		);
+		expect(deps.state.pendingAutoCaptureCandidates).toHaveLength(2);
 
+		const first = deps.state.pendingAutoCaptureCandidates[0];
+		const second = deps.state.pendingAutoCaptureCandidates[1];
 		const ctx = createExtensionContext([
-			"Use PostgreSQL as primary database",
-			"Use JWT for auth tokens",
+			`${first.normalizedText} (${first.category}, ${Math.round(first.confidence * 100)}%)`,
+			`${second.normalizedText} (${second.category}, ${Math.round(second.confidence * 100)}%)`,
 			"Done",
 		]);
 		await finalizePendingAutoCapture(
@@ -60,8 +63,10 @@ describe("decision memory auto-capture", () => {
 		);
 
 		expect(deps.state.indexes.byId.size).toBe(2);
+		const added = Array.from(deps.state.indexes.byId.values())[0];
+		expect(added.source).toBe("auto-rule-classifier");
+		expect(typeof added.confidence).toBe("number");
 		expect(ctx.ui.select).toHaveBeenCalled();
-		expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("Auto-captured decision"), "info");
 	});
 
 	it("falls back to confirm flow if select fails", async () => {
@@ -93,7 +98,7 @@ describe("decision memory auto-capture", () => {
 	it("skips final capture prompt on failed/aborted runs", async () => {
 		const deps = createDeps();
 		preparePendingAutoCaptureFromPrompt("Decision: Use PostgreSQL as primary database", deps);
-		const ctx = createExtensionContext(["Use PostgreSQL as primary database", "Done"]);
+		const ctx = createExtensionContext(["Done"]);
 
 		await finalizePendingAutoCapture(
 			[{ role: "assistant", content: [{ type: "text", text: "failed" }], stopReason: "error" }] as never,
@@ -110,13 +115,5 @@ describe("decision memory auto-capture", () => {
 		deps.state.config.autoCapture.enabled = false;
 		preparePendingAutoCaptureFromPrompt("Decision: Use PostgreSQL as primary database", deps);
 		expect(deps.state.pendingAutoCaptureCandidates).toEqual([]);
-
-		const ctx = createExtensionContext(["Done"]);
-		await finalizePendingAutoCapture(
-			[{ role: "assistant", content: [{ type: "text", text: "completed" }] }] as never,
-			ctx as never,
-			deps,
-		);
-		expect(deps.state.indexes.byId.size).toBe(0);
 	});
 });

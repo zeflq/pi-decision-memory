@@ -41,6 +41,9 @@ export function applyEventToIndexes(indexes: DecisionIndexes, event: DecisionEve
 			supersedes: event.d.supersedes ?? null,
 			conflictsWith: event.d.conflictsWith ?? [],
 			reason: event.d.reason,
+			source: event.d.source,
+			confidence: event.d.confidence,
+			category: event.d.category,
 			createdAt: event.t,
 			updatedAt: event.t,
 			createdBy: event.u,
@@ -68,6 +71,9 @@ export function applyEventToIndexes(indexes: DecisionIndexes, event: DecisionEve
 	existing.tags = event.d.tags ?? existing.tags;
 	existing.status = event.d.status ?? existing.status;
 	existing.reason = event.d.reason ?? existing.reason;
+	existing.source = event.d.source ?? existing.source;
+	existing.confidence = event.d.confidence ?? existing.confidence;
+	existing.category = event.d.category ?? existing.category;
 	existing.supersedes = event.d.supersedes ?? existing.supersedes;
 	existing.conflictsWith = event.d.conflictsWith ?? existing.conflictsWith;
 	existing.updatedAt = event.t;

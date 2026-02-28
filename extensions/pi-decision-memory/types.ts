@@ -1,4 +1,5 @@
 import type { ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
+import type { DecisionCandidateClassification } from "./decision-classifier.js";
 
 export type DecisionStatus = "active" | "draft" | "rejected" | "superseded";
 
@@ -12,6 +13,9 @@ export interface DecisionData {
 	reason?: string;
 	supersedes?: string | null;
 	conflictsWith?: string[];
+	source?: string;
+	confidence?: number;
+	category?: string;
 }
 
 export interface DecisionEvent {
@@ -34,6 +38,9 @@ export interface Decision {
 	supersedes: string | null;
 	conflictsWith: string[];
 	reason?: string;
+	source?: string;
+	confidence?: number;
+	category?: string;
 	createdAt: string;
 	updatedAt: string;
 	createdBy?: string;
@@ -80,7 +87,7 @@ export interface DecisionMemoryState {
 	identity: ProjectIdentity | null;
 	memoryFilePath: string | null;
 	indexes: DecisionIndexes;
-	pendingAutoCaptureCandidates: string[];
+	pendingAutoCaptureCandidates: DecisionCandidateClassification[];
 }
 
 export interface DecisionCommandDeps {
