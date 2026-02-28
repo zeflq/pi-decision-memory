@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { autoCaptureDecisionsFromUserPrompt } from "../extensions/pi-decision-memory/auto-capture.js";
+import { finalizePendingAutoCapture, preparePendingAutoCaptureFromPrompt } from "../extensions/pi-decision-memory/auto-capture.js";
 import { handleDecisionCommand } from "../extensions/pi-decision-memory/commands/index.js";
 import { buildContextInjection } from "../extensions/pi-decision-memory/context.js";
 import type { DecisionCommandDeps, DecisionEvent } from "../extensions/pi-decision-memory/types.js";
@@ -21,9 +21,11 @@ describe("decision memory disabled mode e2e", () => {
 		expect(appendEvent).not.toHaveBeenCalled();
 		expect(notify).toHaveBeenCalledWith("Decision memory is disabled. Enable it to modify decisions.", "warning");
 
-		await autoCaptureDecisionsFromUserPrompt(
-			"Decision: Use PostgreSQL as primary database",
-			{ hasUI: true, ui: { confirm: vi.fn(async () => true), notify: vi.fn() } } as never,
+		preparePendingAutoCaptureFromPrompt("Decision: Use PostgreSQL as primary database", deps);
+		expect(state.pendingAutoCaptureCandidates).toEqual([]);
+		await finalizePendingAutoCapture(
+			[{ role: "assistant", content: [{ type: "text", text: "done" }] }] as never,
+			{ hasUI: true, ui: { confirm: vi.fn(async () => true), select: vi.fn(), notify: vi.fn() } } as never,
 			deps,
 		);
 		expect(appendEvent).not.toHaveBeenCalled();

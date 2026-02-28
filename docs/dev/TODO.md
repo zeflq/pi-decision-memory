@@ -113,14 +113,14 @@
 
 ## Next Iteration: Auto-capture v2 (post-run, multi-select)
 
-- [ ] Extract decision/order candidates from user prompt on `before_agent_start`
-- [ ] Add in-memory pending-candidates state for current turn/session
-- [ ] Trigger capture confirmation on `agent_end` (after work is done)
-- [ ] Implement multi-select review UI to choose which candidates to save
-- [ ] Fallback to sequential Yes/No confirms when multi-select is unavailable
-- [ ] Persist only selected candidates as add events
-- [ ] Enforce duplicate checks before prompt and before persist
-- [ ] Skip post-run capture prompt on failed/cancelled runs
-- [ ] Add tests for multi-candidate selection behavior
-- [ ] Add tests for fallback confirm behavior (no multi-select)
-- [ ] Update README with post-run confirmation flow and examples
+- [x] Extract decision/order candidates from user prompt on `before_agent_start`
+- [x] Add in-memory pending-candidates state for current turn/session
+- [x] Trigger capture confirmation on `agent_end` (after work is done)
+- [x] Implement multi-select review UI to choose which candidates to save
+- [x] Fallback to sequential Yes/No confirms when multi-select is unavailable
+- [x] Persist only selected candidates as add events
+- [x] Enforce duplicate checks before prompt and before persist
+- [x] Skip post-run capture prompt on failed/cancelled runs
+- [x] Add tests for multi-candidate selection behavior
+- [x] Add tests for fallback confirm behavior (no multi-select)
+- [x] Update README with post-run confirmation flow and examples

@@ -23,6 +23,7 @@ function createState(overrides?: Partial<DecisionMemoryState>): DecisionMemorySt
 			byStatus: new Map(),
 			byTag: new Map(),
 		},
+		pendingAutoCaptureCandidates: [],
 		...overrides,
 	};
 }

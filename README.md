@@ -14,8 +14,8 @@ pi install https://github.com/zeflq/pi-decision-memory
   - `.pi/decision-memory/decisions.jsonl`
 - Provides `/decision` commands to add, edit, search, purge, and reset decisions
 - Injects active decisions into context with token-aware limits
-- Supports explicit auto-capture from user prompt lines:
-  - `Decision: <text>`
+- Supports post-run auto-capture from user prompt decision/order lines
+  - example: `Decision: <text>`
 
 ## Usage docs
 

@@ -18,6 +18,7 @@ export function createState(): DecisionMemoryState {
 			byStatus: new Map(),
 			byTag: new Map(),
 		},
+		pendingAutoCaptureCandidates: [],
 	};
 }
 

@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
-import { autoCaptureDecisionsFromUserPrompt } from "./auto-capture.js";
+import { finalizePendingAutoCapture, preparePendingAutoCaptureFromPrompt } from "./auto-capture.js";
 import { handleDecisionCommand } from "./commands/index.js";
 import {
 	getDefaultConfig,
@@ -26,6 +26,7 @@ function createInitialState(): DecisionMemoryState {
 			byStatus: new Map(),
 			byTag: new Map(),
 		},
+		pendingAutoCaptureCandidates: [],
 	};
 }
 
@@ -67,13 +68,13 @@ export default function decisionMemoryExtension(pi: ExtensionAPI): void {
 		},
 	};
 
-	pi.on("before_agent_start", async (event, ctx) => {
-		await autoCaptureDecisionsFromUserPrompt(event.prompt, ctx, deps);
-		return undefined;
+	pi.on("before_agent_start", async (event) => {
+		preparePendingAutoCaptureFromPrompt(event.prompt, deps);
+		return buildContextInjection(event, state);
 	});
 
-	pi.on("before_agent_start", async (event) => {
-		return buildContextInjection(event, state);
+	pi.on("agent_end", async (event, ctx) => {
+		await finalizePendingAutoCapture(event.messages, ctx, deps);
 	});
 
 	pi.registerCommand("decision", {

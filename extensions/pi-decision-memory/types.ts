@@ -80,6 +80,7 @@ export interface DecisionMemoryState {
 	identity: ProjectIdentity | null;
 	memoryFilePath: string | null;
 	indexes: DecisionIndexes;
+	pendingAutoCaptureCandidates: string[];
 }
 
 export interface DecisionCommandDeps {

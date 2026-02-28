@@ -5,7 +5,7 @@ Durable, per-project decision memory for Pi.
 - Canonical storage: append-only JSONL at `<project>/.pi/decision-memory/decisions.jsonl`
 - Fast reads: in-memory indexes rebuilt from JSONL on session start
 - Context injection: token-aware active decisions only
-- Optional auto-capture from explicit user prompt markers (enabled by default, confirm by default)
+- Optional post-run auto-capture from user prompt decision/order lines (enabled by default, confirm by default)
 
 ## Install
 
@@ -131,26 +131,26 @@ Event codes:
 
 ## Auto-capture
 
-On `before_agent_start`, the extension scans the **user prompt** for explicit decision markers.
+Auto-capture is **post-run**:
 
-Supported explicit format:
+1. On `before_agent_start`, the extension extracts decision/order candidates from the user prompt.
+2. On `agent_end`, it asks which candidates to save (multi-select flow).
+3. Selected items are persisted as decisions.
+
+Accepted prompt patterns include:
 
 ```text
 Decision: <your decision text>
-```
-
-You can include multiple lines:
-
-```text
-Decision: Use PostgreSQL as primary database
-Decision: Use JWT for auth tokens
+Use React for frontend
+Do not reuse legacy Lottery tables
 ```
 
 Behavior:
 
-- no heuristic assistant parsing
-- only explicit `Decision:` lines are considered
+- source is user prompt only (never assistant text)
 - capped by `autoCapture.maxPerTurn`
 - skips exact normalized duplicates of active decisions
-- asks confirmation per candidate when `autoCapture.confirm = true`
+- asks confirmation/selection when `autoCapture.confirm = true`
+- if multi-select is unavailable, falls back to per-candidate yes/no confirm
+- skipped on failed/aborted runs by default
 - disabled entirely when `autoCapture.enabled = false`

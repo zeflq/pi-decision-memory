@@ -1,13 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { autoCaptureDecisionsFromUserPrompt } from "../extensions/pi-decision-memory/auto-capture.js";
+import { finalizePendingAutoCapture, preparePendingAutoCaptureFromPrompt } from "../extensions/pi-decision-memory/auto-capture.js";
 import type { DecisionCommandDeps } from "../extensions/pi-decision-memory/types.js";
 import { createState } from "./helpers.js";
 
-function createExtensionContext(confirmResult = true) {
+function createExtensionContext(selectQueue: string[] = [], confirmResult = true) {
 	return {
 		hasUI: true,
 		ui: {
+			select: vi.fn(async () => selectQueue.shift()),
 			confirm: vi.fn(async () => confirmResult),
 			notify: vi.fn(),
 		},
@@ -23,89 +24,99 @@ function createDeps(): DecisionCommandDeps {
 }
 
 describe("decision memory auto-capture", () => {
-	it("captures explicit 'Decision:' lines from user prompt", async () => {
+	it("prepares candidates from explicit and directive prompt lines", () => {
+		const deps = createDeps();
+		deps.state.config.autoCapture.maxPerTurn = 3;
+
+		preparePendingAutoCaptureFromPrompt(
+			"Decision: Use PostgreSQL as primary database\nUse Tailwind for styling\nWhat should we do?",
+			deps,
+		);
+
+		expect(deps.state.pendingAutoCaptureCandidates).toEqual([
+			"Use PostgreSQL as primary database",
+			"Use Tailwind for styling",
+		]);
+	});
+
+	it("captures selected candidates after agent_end", async () => {
 		const deps = createDeps();
 		deps.state.config.autoCapture.enabled = true;
 		deps.state.config.autoCapture.confirm = true;
-		deps.state.config.autoCapture.maxPerTurn = 2;
-		const ctx = createExtensionContext(true);
-
-		await autoCaptureDecisionsFromUserPrompt(
+		preparePendingAutoCaptureFromPrompt(
 			"Decision: Use PostgreSQL as primary database\nDecision: Use JWT for auth tokens",
+			deps,
+		);
+
+		const ctx = createExtensionContext([
+			"Use PostgreSQL as primary database",
+			"Use JWT for auth tokens",
+			"Done",
+		]);
+		await finalizePendingAutoCapture(
+			[{ role: "assistant", content: [{ type: "text", text: "completed" }] }] as never,
 			ctx as never,
 			deps,
 		);
 
 		expect(deps.state.indexes.byId.size).toBe(2);
-		expect(ctx.ui.confirm).toHaveBeenCalledTimes(2);
+		expect(ctx.ui.select).toHaveBeenCalled();
 		expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("Auto-captured decision"), "info");
 	});
 
-	it("respects maxPerTurn limit", async () => {
+	it("falls back to confirm flow if select fails", async () => {
 		const deps = createDeps();
-		deps.state.config.autoCapture.enabled = true;
-		deps.state.config.autoCapture.confirm = false;
-		deps.state.config.autoCapture.maxPerTurn = 1;
-		const ctx = createExtensionContext(true);
+		deps.state.config.autoCapture.confirm = true;
+		preparePendingAutoCaptureFromPrompt("Decision: Use PostgreSQL as primary database", deps);
 
-		await autoCaptureDecisionsFromUserPrompt(
-			"Decision: Use PostgreSQL as primary database\nDecision: Use Redis as cache layer",
+		const ctx = {
+			hasUI: true,
+			ui: {
+				select: vi.fn(async () => {
+					throw new Error("no select");
+				}),
+				confirm: vi.fn(async () => true),
+				notify: vi.fn(),
+			},
+		} as const;
+
+		await finalizePendingAutoCapture(
+			[{ role: "assistant", content: [{ type: "text", text: "completed" }] }] as never,
 			ctx as never,
 			deps,
 		);
 
 		expect(deps.state.indexes.byId.size).toBe(1);
+		expect(ctx.ui.confirm).toHaveBeenCalled();
 	});
 
-	it("skips duplicate active decisions", async () => {
+	it("skips final capture prompt on failed/aborted runs", async () => {
 		const deps = createDeps();
-		deps.state.indexes.byId.set("D-1", {
-			id: "D-1",
-			projectId: "p123",
-			title: "Use PostgreSQL",
-			text: "Use PostgreSQL as primary database",
-			tags: [],
-			status: "active",
-			supersedes: null,
-			conflictsWith: [],
-			createdAt: "2026-01-01T00:00:00.000Z",
-			updatedAt: "2026-01-01T00:00:00.000Z",
-		});
-		deps.state.indexes.byStatus.set("active", new Set(["D-1"]));
-		deps.state.config.autoCapture.enabled = true;
-		deps.state.config.autoCapture.confirm = false;
-		const ctx = createExtensionContext(true);
+		preparePendingAutoCaptureFromPrompt("Decision: Use PostgreSQL as primary database", deps);
+		const ctx = createExtensionContext(["Use PostgreSQL as primary database", "Done"]);
 
-		await autoCaptureDecisionsFromUserPrompt("Decision: Use PostgreSQL as primary database", ctx as never, deps);
-
-		expect(deps.state.indexes.byId.size).toBe(1);
-		expect(ctx.ui.notify).not.toHaveBeenCalledWith(expect.stringContaining("Auto-captured decision"), "info");
-	});
-
-	it("does not capture non-explicit recommendation/explanatory text", async () => {
-		const deps = createDeps();
-		deps.state.config.autoCapture.enabled = true;
-		deps.state.config.autoCapture.confirm = true;
-		const ctx = createExtensionContext(true);
-
-		await autoCaptureDecisionsFromUserPrompt(
-			"It stores decisions in the project itself at: .pi/decision-memory/decisions.jsonl\nRecommended: choose option A",
+		await finalizePendingAutoCapture(
+			[{ role: "assistant", content: [{ type: "text", text: "failed" }], stopReason: "error" }] as never,
 			ctx as never,
 			deps,
 		);
 
 		expect(deps.state.indexes.byId.size).toBe(0);
-		expect(ctx.ui.confirm).not.toHaveBeenCalled();
+		expect(ctx.ui.select).not.toHaveBeenCalled();
 	});
 
 	it("does nothing when autoCapture is disabled", async () => {
 		const deps = createDeps();
 		deps.state.config.autoCapture.enabled = false;
-		const ctx = createExtensionContext(true);
+		preparePendingAutoCaptureFromPrompt("Decision: Use PostgreSQL as primary database", deps);
+		expect(deps.state.pendingAutoCaptureCandidates).toEqual([]);
 
-		await autoCaptureDecisionsFromUserPrompt("Decision: Use PostgreSQL as primary database", ctx as never, deps);
-
+		const ctx = createExtensionContext(["Done"]);
+		await finalizePendingAutoCapture(
+			[{ role: "assistant", content: [{ type: "text", text: "completed" }] }] as never,
+			ctx as never,
+			deps,
+		);
 		expect(deps.state.indexes.byId.size).toBe(0);
-		expect(ctx.ui.confirm).not.toHaveBeenCalled();
 	});
 });

@@ -164,25 +164,14 @@ Optional (later):
 - `resolve <id> <status>`
 - `doctor` (integrity and duplicate checks)
 
-### Auto-capture (current)
-- Trigger: `before_agent_start`
-- Source: explicit user prompt markers only
-- Extraction: `Decision: <text>` lines (no assistant heuristic parsing)
-- Dedup: skip if exact normalized match against existing active decisions
-- Safety: optional per-candidate confirmation (`autoCapture.confirm`)
-- Throughput cap: `autoCapture.maxPerTurn`
-
-### Auto-capture v2 (planned)
-Goal: capture user decisions/orders with confirmation **after** task execution.
-
+### Auto-capture
 - Step 1 (`before_agent_start`): extract candidate directives/decisions from user prompt.
 - Step 2: keep candidates in-memory as `pending` for the current turn.
-- Step 3 (`agent_end`): present one review prompt with multi-select choices.
+- Step 3 (`agent_end`): present one review prompt with selectable choices.
 - Step 4: persist only selected items as `a` (add) events.
 
 Rules:
 - Source is user prompt only (never assistant text).
-- No heuristic assistant parsing.
 - Dedup before UI and before persist.
 - Respect `autoCapture.maxPerTurn`.
 - If multi-select UI is unavailable, fall back to per-candidate Yes/No confirmations.
